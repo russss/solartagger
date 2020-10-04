@@ -105,7 +105,7 @@ async def next(request):
                     WHERE osm_id = candidates.osm_id
                     AND user_id = :user_id)
                 GROUP BY candidates.osm_id, candidates.geometry
-                HAVING count(results) < 4
+                HAVING count(results) < 3
                 ORDER BY osm_id DESC
                 LIMIT 1"""
 
