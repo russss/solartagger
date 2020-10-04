@@ -1,0 +1,95 @@
+<div id="map" class="box"></div>
+<div class="box" id="controls">
+  <label for="modules_count">Enter number of modules:</label>
+  <input type="number" id="modules_count" min="0" max="300"/>
+  <button id="submit">Submit</button>
+  <button id="skip">Skip</button>
+</div>
+<div class="box">
+  <h3>Instructions</h3>
+  <p>The aim of this task is to count the number of solar panel <em>modules</em> in solar installations (generators) mapped in OpenStreetMap.</p>
+  <p>The solar installation should be positioned in the centre of the image, with a yellow circle around it. However, the
+     imagery provided may not perfectly align with the position of the generator, and it may extend outside the circle.</p>
+
+  <p>Normally a solar generator is a consistent block of panels - if a building has generators on two separate roof
+  faces they should be mapped separately. Smaller circles are drawn around other solar installations visible in the image
+  to assist with identifying the correct one.</p>
+
+  <p>Type in the number of modules and hit "Submit" or press enter to see the next image. If the individual modules are not visible,
+      if there are too many to easily count, or if it's not clear which generator is tagged, press "Skip" or just press enter without
+      entering a number of modules.</p>
+</div>
+<script>
+  let map = null;
+  let marker = null;
+  let surrounding_markers = [];
+  let feature_id = null;
+
+  function createMap() {
+    var mymap = L.map('map', {
+      dragging: false,
+      boxZoom: false,
+      doubleClickZoom: false,
+      scrollWheelZoom: false,
+      zoomControl: false});
+    var bing = new L.BingLayer('Aj-e3hOlwad0p0QnjZKUWoJbvtluYWwjbW8OvB4go6kTMMZ1ECu9yMdI-dN3K1ji', {maxNativeZoom: 20});
+    mymap.addLayer(bing);
+    return mymap;
+  }
+
+  function nextFeature(data) {
+    fetch('/next', {method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+      }).then(response => response.json())
+      .then(data => {
+          if (!map) {
+            map = createMap();
+          }
+          if (marker) {
+            map.removeLayer(marker);
+          }
+          for (const marker of surrounding_markers) {
+            map.removeLayer(marker);
+          }
+          surrounding_markers = [];
+
+          feature_id = data['osm_id'];
+          map.setView(data['location'], 21);
+
+          for (const s of data['surrounding']) {
+            surrounding_markers.push(
+              L.circle(s, {radius: 3, interactive: false, opacity: 0.3, weight: 1, color: '#eeeeee', fill: false}).addTo(map)
+            );
+          }
+          marker = L.circle(data['location'], {radius: 5, interactive: false, color: '#fffa33', opacity: 0.3, fill: false}).addTo(map);
+      })
+    document.getElementById('modules_count').value = '';
+    document.getElementById('modules_count').focus();
+  }
+
+  document.getElementById('skip').onclick = (e) => {
+    nextFeature({osm_id: feature_id, action: 'skip', skip_reason: 'unknown'});
+  }
+
+  const modules_count = document.getElementById('modules_count');
+  function submit() {
+    let value = parseInt(modules_count.value);
+    if (value) {
+      nextFeature({osm_id: feature_id, action: 'add', module_count: value});
+    } else {
+      nextFeature({osm_id: feature_id, action: 'skip', skip_reason: 'unknown'});
+    }
+  }
+
+  modules_count.onkeyup = (e) => {
+    if (e.key === 'Enter') {
+      submit();
+    }
+  }
+
+  document.getElementById('submit').onclick = (e) => submit();
+
+  nextFeature({});
+
+</script>

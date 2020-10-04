@@ -1,0 +1,22 @@
+{% extends "_base.html" %}
+{% block content -%}
+  <header>
+    <h1>OSM Solar Tagger</h1>
+    {% if user %}
+      <p>Logged in as <a href="https://openstreetmap.org/user/{{user['display_name']}}">{{user['display_name']}}</a>.
+          <a href="/logout">Log out</a></p>
+    {% endif %}
+  </header>
+  <div id="content">
+    {% if user %}
+      {% include "app.html" %}
+    {% else %}
+      <p>This app provides an easy way to improve the data on solar installations on OpenStreetMap.
+          Currently it is collecting data on the number of modules in solar installations in the UK.</p>
+      <p class="emphasis">To get started, you'll need to <a href="{{url_for('login')}}">log in</a> with your OpenStreetMap account.</p>
+    {% endif %}
+  </div>
+  <footer>
+    &copy; <a href="https://russ.garrett.co.uk">Russ Garrett</a> 2020. {% if user %}<a href="mailto:russ@garrett.co.uk">Feedback</a>{% endif %}
+  </footer>
+{% endblock %}
