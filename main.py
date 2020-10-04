@@ -95,14 +95,19 @@ async def next(request):
                         osm_id=data['osm_id'], user_id=request.session['user_id'],
                         module_count=data['module_count'])
 
-    q = """SELECT osm_id,
+    q = """SELECT candidates.osm_id,
                     ST_X(ST_Transform(geometry, 4326)) AS lon,
                     ST_Y(ST_Transform(geometry, 4326)) AS lat
                 FROM solartag.candidates
+                LEFT OUTER JOIN solartag.results ON candidates.osm_id = results.osm_id
                 WHERE NOT EXISTS (
                     SELECT 1 FROM solartag.results
                     WHERE osm_id = candidates.osm_id
-                    AND user_id = :user_id) ORDER BY osm_id DESC LIMIT 1"""
+                    AND user_id = :user_id)
+                GROUP BY candidates.osm_id, candidates.geometry
+                HAVING count(results) < 4
+                ORDER BY osm_id DESC
+                LIMIT 1"""
 
     point = await database.fetch_one(q, {'user_id': request.session['user_id']})
     surrounding = await database.fetch_all("""SELECT ST_X(ST_Transform(geometry, 4326)) AS lon,
