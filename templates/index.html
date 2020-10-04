@@ -11,9 +11,17 @@
     {% if user %}
       {% include "app.html" %}
     {% else %}
-      <p>This app provides an easy way to improve the data on solar installations on OpenStreetMap.
-          Currently it is collecting data on the number of modules in solar installations in the UK.</p>
-      <p class="emphasis">To get started, you'll need to <a href="{{url_for('login')}}">log in</a> with your OpenStreetMap account.</p>
+      <p>This app provides an easy way to improve the data on solar installations on OpenStreetMap.</p>
+
+      <p>Currently we're collecting data on the number of <em>modules</em> in solar installations in the UK.
+          A module is a single solar panel, and they're commonly grouped together in an installation (or
+          <em>generator</em> in OSM terminology).</p>
+
+      <p>Here's an example of a generator which has 14 modules:</p>
+
+      <img src="/static/example-1.png" width="400px">
+
+      <p class="emphasis">To get started, you'll need to <a href="{{url_for('login')}}">log in with your OpenStreetMap account</a>.</p>
     {% endif %}
   </div>
   <footer>
