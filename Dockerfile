@@ -4,4 +4,4 @@ WORKDIR /app
 COPY . .
 RUN poetry install
 
-ENTRYPOINT ["poetry", "run", "uvicorn", "main:app"]
+ENTRYPOINT ["poetry", "run", "uvicorn", "--host", "0.0.0.0", "--port", "80", "main:app"]
