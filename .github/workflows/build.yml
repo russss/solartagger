@@ -18,4 +18,4 @@ jobs:
           registry: docker.pkg.github.com
           repository: russss/solartagger/solartagger
           tag_with_ref: true
-          tags: ['latest']
+          tags: 'latest'
