@@ -6,7 +6,9 @@ create unique index solartag_candidates_osm_id on solartag.candidates(osm_id);
 
 CREATE TABLE solartag.users (id INTEGER PRIMARY KEY,
 				display_name TEXT NOT NULL,
-				token JSONB NOT NULL);
+				token JSONB NOT NULL,
+				created TIMESTAMP WITHOUT TIME ZONE DEFAULT now()
+			);
 
 CREATE TABLE solartag.results (osm_id BIGINT NOT NULL,
 				user_id INTEGER NOT NULL REFERENCES solartag.users(id),
@@ -14,4 +16,41 @@ CREATE TABLE solartag.results (osm_id BIGINT NOT NULL,
 				skip_reason TEXT,
 				date TIMESTAMP WITHOUT TIME ZONE DEFAULT now());
 
-create index results_user_id on solartag.results (user_id);
+create unique index results_user_id_osm_id on solartag.results (user_id, osm_id);
+
+CREATE OR REPLACE FUNCTION solartag.int_decision_arr(data INTEGER[])
+RETURNS BOOLEAN IMMUTABLE
+AS $$
+DECLARE
+	threshold NUMERIC;
+	skips INTEGER;
+	result INTEGER;
+BEGIN
+	skips := (select count(*) from unnest(data) as value where value is null);
+
+	IF skips > 3 THEN
+		RETURN TRUE;
+	END IF;
+	
+	threshold := GREATEST(((select count(*) from unnest(data)) - skips) * 0.6, 2);
+	-- RAISE NOTICE 'threshold for % is %', data, threshold;
+	result := (SELECT value FROM (
+			SELECT value, count(*) FROM unnest(data) AS value
+			WHERE value IS NOT NULL
+			GROUP BY value
+			HAVING count(*) > threshold
+			ORDER BY count DESC LIMIT 1
+		) a);
+	IF result IS NOT NULL THEN
+		RETURN TRUE;
+	ELSE 
+		RETURN FALSE;
+	END IF;
+END
+$$ LANGUAGE plpgsql;
+
+CREATE AGGREGATE solartag.int_decision(INTEGER) (
+	sfunc = array_append,
+	stype = integer[],
+	finalfunc = solartag.int_decision_arr
+);
