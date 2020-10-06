@@ -18,11 +18,11 @@ CREATE TABLE solartag.results (osm_id BIGINT NOT NULL,
 
 create unique index results_user_id_osm_id on solartag.results (user_id, osm_id);
 
+-- Given an array of integer results (i.e. module count), which can be null if 
 CREATE OR REPLACE FUNCTION solartag.int_decision_arr(data INTEGER[])
 RETURNS BOOLEAN IMMUTABLE
 AS $$
 DECLARE
-	threshold NUMERIC;
 	skips INTEGER;
 	result INTEGER;
 BEGIN
@@ -32,15 +32,7 @@ BEGIN
 		RETURN TRUE;
 	END IF;
 	
-	threshold := GREATEST(((select count(*) from unnest(data)) - skips) * 0.6, 2);
-	-- RAISE NOTICE 'threshold for % is %', data, threshold;
-	result := (SELECT value FROM (
-			SELECT value, count(*) FROM unnest(data) AS value
-			WHERE value IS NOT NULL
-			GROUP BY value
-			HAVING count(*) > threshold
-			ORDER BY count DESC LIMIT 1
-		) a);
+	result := solartag.int_decision_value_arr(data);
 	IF result IS NOT NULL THEN
 		RETURN TRUE;
 	ELSE 
@@ -49,8 +41,33 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION solartag.int_decision_value_arr(data INTEGER[])
+RETURNS INTEGER IMMUTABLE
+AS $$
+DECLARE
+	threshold NUMERIC;
+BEGIN
+	threshold := GREATEST((select count(*) from unnest(data) AS value WHERE value IS NOT NULL) * 0.6, 2);
+	-- RAISE NOTICE 'threshold for % is %', data, threshold;
+	RETURN (SELECT value FROM (
+			SELECT value, count(*) FROM unnest(data) AS value
+			WHERE value IS NOT NULL
+			GROUP BY value
+			HAVING count(*) > threshold
+			ORDER BY count DESC LIMIT 1
+		) a);
+END
+$$ LANGUAGE plpgsql;
+
+
 CREATE AGGREGATE solartag.int_decision(INTEGER) (
 	sfunc = array_append,
 	stype = integer[],
 	finalfunc = solartag.int_decision_arr
+);
+
+CREATE AGGREGATE solartag.int_decision_value(INTEGER) (
+	sfunc = array_append,
+	stype = integer[],
+	finalfunc = solartag.int_decision_value_arr
 );
