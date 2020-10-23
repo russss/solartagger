@@ -8,6 +8,8 @@ async def main():
 
     print("Connecting...")
     await database.connect()
+    print("Updating materialised view...")
+    await database.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY solartag.candidates")
     print("Fetching nodes...")
     res = await database.fetch_all("""SELECT results.osm_id, array_agg(results.user_id) AS users,
                                     solartag.int_decision_value(module_count) AS modules
@@ -16,16 +18,21 @@ async def main():
                        GROUP BY results.osm_id
                        HAVING solartag.int_decision(module_count) = true
                         AND solartag.int_decision_value(module_count) IS NOT NULL
-                       LIMIT 20""")
+                       ORDER BY results.osm_id DESC
+                       LIMIT 100""")
 
     users = set()
     for row in res:
         users |= set(row['users'])
 
+    if len(list(res)) < 10:
+        print("Fewer than 10 new changes, not submitting.")
+        return
+
     print("Creating changeset...")
     osm.ChangesetCreate({"contributor_ids": ";".join(map(str, users)),
                          "source": "https://solartagger.russss.dev",
-                         "comment": "Update generator:solar:modules tag",
+                         "comment": "Add generator:solar:modules tag",
                          "bot": "yes",
                          "imagery_used": "Bing"
                          })
