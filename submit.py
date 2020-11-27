@@ -10,41 +10,45 @@ async def main():
     await database.connect()
     print("Updating materialised view...")
     await database.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY solartag.candidates")
-    print("Fetching nodes...")
-    res = await database.fetch_all("""SELECT results.osm_id, array_agg(results.user_id) AS users,
-                                    solartag.int_decision_value(module_count) AS modules
-                       FROM solartag.results, solartag.candidates
-                       WHERE results.osm_id = candidates.osm_id
-                       GROUP BY results.osm_id
-                       HAVING solartag.int_decision(module_count) = true
-                        AND solartag.int_decision_value(module_count) IS NOT NULL
-                       ORDER BY results.osm_id DESC
-                       LIMIT 100""")
+    print("Fetching changes...")
 
-    users = set()
-    for row in res:
-        users |= set(row['users'])
+    while True:
+        res = await database.fetch_all("""SELECT results.osm_id, array_agg(results.user_id) AS users,
+                                        solartag.int_decision_value(module_count) AS modules
+                           FROM solartag.results, solartag.candidates
+                           WHERE results.osm_id = candidates.osm_id
+                           GROUP BY results.osm_id
+                           HAVING solartag.int_decision(module_count) = true
+                            AND solartag.int_decision_value(module_count) IS NOT NULL
+                           ORDER BY results.osm_id DESC
+                           LIMIT 100""")
 
-    if len(list(res)) < 10:
-        print("Fewer than 10 new changes, not submitting.")
-        return
+        users = set()
+        for row in res:
+            users |= set(row['users'])
 
-    print("Creating changeset...")
-    osm.ChangesetCreate({"contributor_ids": ";".join(map(str, users)),
-                         "source": "https://solartagger.russss.dev",
-                         "comment": "Add generator:solar:modules tag",
-                         "bot": "yes",
-                         "imagery_used": "Bing"
-                         })
-    for row in res:
-        node = osm.NodeGet(row['osm_id'])
-        if 'generator:solar:modules' in node['tag']:
-            print("Tag already exists for node", node['id'])
-            continue
-        node['tag']['generator:solar:modules'] = str(row['modules'])
-        osm.NodeUpdate(node)
+        if len(list(res)) < 10:
+            print("Fewer than 10 new changes, not submitting.")
+            return
 
-    osm.ChangesetClose()
-    print("Done")
+        print(f"Submitting changeset of {len(list(res))} objects...")
+
+        print("Creating changeset...")
+        osm.ChangesetCreate({"contributor_ids": ";".join(map(str, users)),
+                             "source": "https://solartagger.russss.dev",
+                             "comment": "Add generator:solar:modules tag",
+                             "bot": "yes",
+                             "imagery_used": "Bing"
+                             })
+        for row in res:
+            node = osm.NodeGet(row['osm_id'])
+            if 'generator:solar:modules' in node['tag']:
+                print("Tag already exists for node", node['id'])
+                continue
+            node['tag']['generator:solar:modules'] = str(row['modules'])
+            osm.NodeUpdate(node)
+
+        osm.ChangesetClose()
+        print("Done")
 
 asyncio.run(main())
